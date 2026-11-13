@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Harcamalar">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Harcamalar">
+<title>Harcama Takvimi</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: {
+      display: ['"Bricolage Grotesque"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif']
+    }
+  } }
+};
+</script>
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { height: 100%; }
+  body { background: #0f172a; color: #f1f5f9; color-scheme: dark; padding-bottom: env(safe-area-inset-bottom, 0px); -webkit-tap-highlight-color: transparent; }
+  #sheet { position: fixed; left: 0; right: 0; bottom: 0; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1), visibility 0s linear .32s; border-radius: 1.5rem 1.5rem 0 0; visibility: hidden; }
+  #sheet.open { transform: translateY(0); visibility: visible; transition-delay: 0s; }
+  .overlay { opacity: 0; pointer-events: none; transition: opacity .25s; }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .bar { transition: width .5s cubic-bezier(.2,.8,.2,1); }
+  .day:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { #sheet, .overlay, .bar { transition: none; } }
+  @media (min-width: 640px) {
+    #sheet { left: 50%; right: auto; bottom: 1.5rem; width: 28rem; max-width: calc(100vw - 2rem); border-radius: 1.5rem; transform: translate(-50%, calc(100% + 2rem)); }
+    #sheet.open { transform: translate(-50%, 0); }
+  }
+</style>
+</head>
+<body class="font-sans bg-slate-900 text-slate-100">
+<div class="mx-auto max-w-3xl min-h-full pb-10">
+
+  <!-- Üst bar -->
+  <header class="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-700 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <p class="text-xs text-slate-400">Harcama Takvimi</p>
+        <h1 id="monthTitle" class="font-display text-2xl font-bold leading-tight">—</h1>
+      </div>
+      <div class="text-right">
+        <p class="text-xs text-slate-400">Aylık toplam</p>
+        <p id="monthTotal" class="font-display text-2xl font-bold text-emerald-400 leading-tight">₺0</p>
+      </div>
+    </div>
+    <div class="mt-3 flex items-center gap-2">
+      <button id="prevBtn" aria-label="Önceki ay" class="h-10 w-10 rounded-full border border-slate-700 bg-slate-800 text-slate-100 grid place-items-center active:scale-95">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button id="todayBtn" class="h-10 px-4 rounded-full border border-slate-700 bg-slate-800 text-slate-100 text-sm font-medium active:scale-95">Bugün</button>
+      <button id="nextBtn" aria-label="Sonraki ay" class="h-10 w-10 rounded-full border border-slate-700 bg-slate-800 text-slate-100 grid place-items-center active:scale-95">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <span id="syncStatus" class="ml-auto flex items-center gap-2 text-xs text-slate-400" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <main class="px-1.5 sm:px-4 pt-3">
+    <div id="storeWarn" class="hidden mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 text-sm px-3 py-2"></div>
+    <!-- Takvim -->
+    <section aria-label="Takvim" class="bg-slate-800 rounded-2xl border border-slate-700 p-1 sm:p-3">
+      <div class="grid grid-cols-7 text-center text-[11px] sm:text-xs font-medium text-slate-400 pb-1.5">
+        <div>Pzt</div><div>Sal</div><div>Çar</div><div>Per</div><div>Cum</div><div class="text-emerald-400">Cmt</div><div class="text-emerald-400">Paz</div>
+      </div>
+      <div id="grid" class="grid grid-cols-7 gap-0.5 sm:gap-1"></div>
+    </section>
+
+    <!-- Kategori analizi -->
+    <section aria-label="Kategori dağılımı" class="mt-4 bg-slate-800 rounded-2xl border border-slate-700 p-4 sm:p-5">
+      <div class="flex items-baseline justify-between mb-4">
+        <h2 class="font-display text-lg font-bold">Kategori dağılımı</h2>
+        <span id="expenseCount" class="text-xs text-slate-400"></span>
+      </div>
+      <div id="analysis" class="space-y-4"></div>
+    </section>
+
+    <!-- Veri yedeği -->
+    <section aria-label="Veri yedeği" class="mt-4 bg-slate-800 rounded-2xl border border-slate-700 p-4 sm:p-5">
+      <h2 class="font-display text-lg font-bold">Veri yedeği</h2>
+      <p class="text-sm text-slate-400 mt-1">Harcamaların yalnızca bu cihazda saklanır, hiçbir yere gönderilmez. Safari verileri temizlenirse silinebilir; yedeği kaydedip Dosyalar'da sakla (açılan menüden «Dosyalara Kaydet»).</p>
+      <p id="backupInfo" class="mt-3 text-sm text-slate-300"></p>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button id="exportBtn" type="button" class="h-11 rounded-xl bg-emerald-500 text-slate-900 font-bold active:scale-[.98]">Yedeği kaydet</button>
+        <button id="importBtn" type="button" class="h-11 rounded-xl border border-slate-600 bg-slate-900 text-slate-100 font-medium active:scale-[.98]">Yedekten yükle</button>
+      </div>
+      <button id="clearDemoBtn" type="button" class="hidden mt-2 w-full h-11 rounded-xl border border-slate-600 bg-slate-900 text-slate-300 text-sm active:scale-[.98]">Örnek verileri temizle</button>
+      <input id="importFile" type="file" accept=".json,application/json" class="hidden">
+    </section>
+  </main>
+</div>
+
+<div id="toast" role="status" class="hidden fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[90vw] rounded-full bg-slate-700 border border-slate-600 text-slate-100 text-sm px-4 py-2 shadow-lg"></div>
+
+<!-- Bottom sheet -->
+<div id="overlay" class="overlay fixed inset-0 z-30 bg-black/65"></div>
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"
+     class="z-40 bg-slate-800 text-slate-100 shadow-2xl border border-slate-700 flex flex-col" style="max-height:88vh;max-height:88dvh">
+  <div class="pt-2.5 pb-1 grid place-items-center"><div class="h-1.5 w-10 rounded-full bg-slate-600"></div></div>
+  <div class="px-5 pb-3 flex items-start justify-between">
+    <div>
+      <h3 id="sheetTitle" class="font-display text-xl font-bold">—</h3>
+      <p id="sheetSum" class="text-sm text-slate-400"></p>
+    </div>
+    <button id="closeBtn" aria-label="Kapat" class="h-9 w-9 rounded-full bg-slate-700 border border-slate-600 text-slate-100 grid place-items-center">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <div class="overflow-y-auto overscroll-contain px-5 flex-1" style="-webkit-overflow-scrolling:touch">
+    <ul id="dayList" class="space-y-2"></ul>
+
+    <form id="addForm" class="mt-4 mb-4 bg-slate-900/60 rounded-2xl border border-slate-700 p-3 space-y-2.5" autocomplete="off">
+      <p class="text-sm font-bold">Harcama ekle</p>
+      <input id="fDesc" type="text" required maxlength="60" placeholder="Açıklama (örn. Öğle yemeği)"
+             class="w-full h-11 rounded-xl border border-slate-600 px-3 text-base bg-slate-900 text-slate-100 placeholder-slate-500">
+      <div class="grid grid-cols-2 gap-2.5">
+        <input id="fAmount" type="number" inputmode="decimal" min="0.01" step="0.01" required placeholder="Tutar (₺)"
+               class="h-11 rounded-xl border border-slate-600 px-3 text-base bg-slate-900 text-slate-100 placeholder-slate-500">
+        <select id="fCat" class="h-11 rounded-xl border border-slate-600 px-2 text-base bg-slate-900 text-slate-100"></select>
+      </div>
+      <button type="submit" class="w-full h-11 rounded-xl bg-emerald-500 text-slate-900 font-bold hover:bg-emerald-400 active:scale-[.98]">Harcamayı ekle</button>
+    </form>
+  </div>
+  <div style="height: env(safe-area-inset-bottom, 0px)"></div>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'harcama-takvimi-v1';
+  const MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const CATS = {
+    'Yemek':    '#fb923c',
+    'Ulaşım':   '#60a5fa',
+    'Fatura':   '#a78bfa',
+    'Alışveriş':'#f472b6',
+    'Eğlence':  '#fbbf24',
+    'Diğer':    '#94a3b8'
+  };
+
+  /* ---------- Yardımcılar ---------- */
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const fmt = n => '₺' + Math.round(n).toLocaleString('tr-TR');
+  const fmtShort = n => {
+    if (n >= 1000) {
+      const k = n >= 10000 ? Math.round(n / 1000) : Math.round(n / 100) / 10;
+      return '₺' + String(k).replace('.', ',') + 'k';
+    }
+    return '₺' + Math.round(n);
+  };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  /* ---------- Depolama ---------- */
+  function demoData() {
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+    const last = new Date(y, m + 1, 0).getDate();
+    const d = n => iso(y, m, Math.min(n, last));
+    const rows = [
+      [1,'Market alışverişi',640,'Yemek'],[1,'Akbil yükleme',200,'Ulaşım'],
+      [3,'Elektrik faturası',780,'Fatura'],[4,'Öğle yemeği',210,'Yemek'],
+      [6,'Sinema',320,'Eğlence'],[6,'Akşam yemeği',450,'Yemek'],
+      [8,'Taksi',185,'Ulaşım'],[9,'Spor ayakkabı',1650,'Alışveriş'],
+      [11,'İnternet faturası',420,'Fatura'],[12,'Kahve',95,'Yemek'],
+      [14,'Konser bileti',900,'Eğlence'],[15,'Benzin',1200,'Ulaşım'],
+      [17,'Kitap',260,'Alışveriş'],[19,'Brunch',540,'Yemek'],
+      [21,'Su faturası',230,'Fatura'],[22,'Hediye',380,'Diğer'],
+      [24,'Market alışverişi',720,'Yemek'],[26,'Metro',150,'Ulaşım']
+    ];
+    return rows.map(r => ({ id: uid(), date: d(r[0]), desc: r[1], amount: r[2], cat: r[3], demo: true }));
+  }
+  const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const META_KEY = 'harcama-takvimi-meta-v1';
+  function getMeta() { try { return JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch (e) { return {}; } }
+  function setMeta(patch) { try { localStorage.setItem(META_KEY, JSON.stringify(Object.assign(getMeta(), patch))); } catch (e) {} }
+  const markEdit = () => { setMeta({ lastEdit: Date.now() }); updateBackupInfo(); };
+  const markBackup = () => { setMeta({ lastBackup: Date.now() }); updateBackupInfo(); };
+  function updateBackupInfo() {
+    const el = $('backupInfo');
+    if (!el) return;
+    const m = getMeta();
+    const hasReal = expenses.some(e => !e.demo);
+    const when = t => new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    if (!hasReal) { el.textContent = ''; el.className = 'hidden'; return; }
+    if (!m.lastBackup) { el.textContent = 'Henüz yedek kaydetmedin.'; el.className = 'mt-3 text-sm text-amber-300'; }
+    else if ((m.lastEdit || 0) > m.lastBackup) { el.textContent = 'Son yedekten (' + when(m.lastBackup) + ') sonra değişiklik yaptın. Yeni yedek kaydet.'; el.className = 'mt-3 text-sm text-amber-300'; }
+    else { el.textContent = 'Yedek güncel (' + when(m.lastBackup) + ').'; el.className = 'mt-3 text-sm text-emerald-300'; }
+  }
+
+  const IDB_NAME = 'harcama-takvimi', IDB_STORE = 'kv';
+  let lsOk = false, idbOk = false;
+
+  function idb() {
+    return new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open(IDB_NAME, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore(IDB_STORE);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+  }
+  async function idbGet() {
+    const d = await idb();
+    return new Promise((res, rej) => {
+      const q = d.transaction(IDB_STORE).objectStore(IDB_STORE).get('data');
+      q.onsuccess = () => res(q.result || null);
+      q.onerror = () => rej(q.error);
+    });
+  }
+  async function idbSet(v) {
+    const d = await idb();
+    return new Promise((res, rej) => {
+      const t = d.transaction(IDB_STORE, 'readwrite');
+      t.objectStore(IDB_STORE).put(v, 'data');
+      t.oncomplete = res;
+      t.onerror = () => rej(t.error);
+    });
+  }
+  function parsePayload(raw) {
+    try {
+      const p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (Array.isArray(p)) return { savedAt: 0, items: p };
+      if (p && Array.isArray(p.items)) return { savedAt: p.savedAt || 0, items: p.items };
+    } catch (e) {}
+    return null;
+  }
+  function lsRead() {
+    try { const r = localStorage.getItem(STORAGE_KEY); return r === null ? null : parsePayload(r); } catch (e) { return null; }
+  }
+  // Her kayıtta veri iki yere birden yazılır: localStorage + IndexedDB
+  function save(list, keepTs) {
+    const payload = { v: 1, savedAt: keepTs || Date.now(), items: list };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); lsOk = true; } catch (e) { lsOk = false; }
+    idbSet(payload).then(() => { idbOk = true; updateStatus(); }).catch(() => { idbOk = false; updateStatus(); });
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const ok = lsOk || idbOk;
+    const el = $('syncStatus');
+    el.innerHTML = '';
+    const dot = document.createElement('span');
+    dot.className = 'h-2 w-2 rounded-full ' + (ok ? 'bg-emerald-400' : 'bg-red-400');
+    const txt = document.createElement('span');
+    txt.textContent = ok ? 'Bu cihazda kayıtlı' : 'Kaydedilemiyor';
+    el.append(dot, txt);
+    const warn = $('storeWarn');
+    if (!ok) {
+      warn.textContent = 'Bu tarayıcı veri kaydetmeye izin vermiyor. Dosyayı Chrome ile, İndirilenler klasöründen aç (gizli sekme kullanma).';
+      warn.classList.remove('hidden');
+    } else if (IS_IOS && !/^https?:$/.test(location.protocol)) {
+      warn.textContent = 'iPhone\'da yerel dosya olarak açılan sayfaların verisini Safari sık sık silebilir. Harcama girdikçe aşağıdaki «Yedeği kaydet» ile yedeği Dosyalar\'a kaydetmeyi unutma.';
+      warn.classList.remove('hidden');
+    } else if (location.protocol === 'content:') {
+      warn.textContent = 'Dosya bir uygulamadan (ör. WhatsApp) açılmış görünüyor; tarayıcı bu şekilde açılan sayfanın verisini kalıcı tutmayabilir. Dosyayı İndirilenler klasöründen aç ve düzenli olarak yedek indir.';
+      warn.classList.remove('hidden');
+    } else {
+      warn.classList.add('hidden');
+    }
+  }
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(toast.h);
+    toast.h = setTimeout(() => t.classList.add('hidden'), 2600);
+  }
+
+  /* ---------- Durum ---------- */
+  let expenses = [];
+  const today = new Date();
+  let viewY = today.getFullYear(), viewM = today.getMonth();
+  let selected = null; // 'YYYY-MM-DD'
+
+  const monthPrefix = () => `${viewY}-${pad(viewM + 1)}-`;
+  const monthItems = () => expenses.filter(e => e.date.startsWith(monthPrefix()));
+
+  /* ---------- Çizim ---------- */
+  function render() {
+    $('monthTitle').textContent = `${MONTHS[viewM]} ${viewY}`;
+    const items = monthItems();
+    const total = items.reduce((s, e) => s + e.amount, 0);
+    $('monthTotal').textContent = fmt(total);
+
+    // Gün toplamları
+    const perDay = {};
+    items.forEach(e => { perDay[e.date] = (perDay[e.date] || 0) + e.amount; });
+
+    const first = new Date(viewY, viewM, 1);
+    const offset = (first.getDay() + 6) % 7; // Pazartesi başlangıç
+    const days = new Date(viewY, viewM + 1, 0).getDate();
+    const todayIso = iso(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const grid = $('grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < offset; i++) grid.appendChild(document.createElement('div'));
+    for (let d = 1; d <= days; d++) {
+      const key = iso(viewY, viewM, d);
+      const sum = perDay[key] || 0;
+      const isToday = key === todayIso;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'day relative flex flex-col items-center justify-between rounded-xl border min-h-[3.9rem] sm:min-h-[5rem] py-1 px-0.5 sm:px-1 min-w-0 overflow-hidden active:scale-95 transition ' +
+        (isToday ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-700 bg-slate-900/60 hover:bg-slate-700/60');
+      btn.setAttribute('aria-label', `${d} ${MONTHS[viewM]}` + (sum ? `, toplam ${fmt(sum)}` : ', harcama yok'));
+      const num = document.createElement('span');
+      num.className = 'text-sm font-medium leading-none mt-0.5 ' + (isToday ? 'text-emerald-400 font-bold' : 'text-slate-100');
+      num.textContent = d;
+      btn.appendChild(num);
+      const slot = document.createElement('span');
+      slot.className = 'w-full';
+      if (sum > 0) {
+        const b = document.createElement('span');
+        b.className = 'block w-full text-center whitespace-nowrap rounded-full bg-emerald-500 text-slate-900 text-[10px] sm:text-xs font-bold tracking-tight px-0.5 sm:px-1.5 py-1 sm:py-0.5 leading-none tabular-nums';
+        b.textContent = fmtShort(sum);
+        slot.appendChild(b);
+      }
+      btn.appendChild(slot);
+      btn.addEventListener('click', () => openSheet(key));
+      grid.appendChild(btn);
+    }
+    renderAnalysis(items, total);
+    $('clearDemoBtn').classList.toggle('hidden', !expenses.some(e => e.demo));
+    updateBackupInfo();
+  }
+
+  function renderAnalysis(items, total) {
+    const box = $('analysis');
+    box.innerHTML = '';
+    $('expenseCount').textContent = items.length ? `${items.length} harcama` : '';
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.className = 'text-sm text-slate-400';
+      p.textContent = 'Bu ay henüz harcama yok. Takvimden bir güne dokunup ilk harcamanı ekle.';
+      box.appendChild(p);
+      return;
+    }
+    const by = {};
+    items.forEach(e => { by[e.cat] = (by[e.cat] || 0) + e.amount; });
+    Object.entries(by).sort((a, b) => b[1] - a[1]).forEach(([cat, sum]) => {
+      const pct = total ? (sum / total) * 100 : 0;
+      const color = CATS[cat] || CATS['Diğer'];
+      const row = document.createElement('div');
+      row.innerHTML = `
+        <div class="flex items-center justify-between text-sm mb-1.5">
+          <span class="flex items-center gap-2 font-medium"><span class="h-2.5 w-2.5 rounded-full" style="background:${color}"></span><span class="cat"></span></span>
+          <span class="tabular-nums"><span class="font-bold">${fmt(sum)}</span> <span class="text-slate-400">· %${pct.toFixed(1).replace('.', ',')}</span></span>
+        </div>
+        <div class="h-2.5 rounded-full bg-slate-700 overflow-hidden"><div class="bar h-full rounded-full" style="width:0;background:${color}"></div></div>`;
+      row.querySelector('.cat').textContent = cat;
+      box.appendChild(row);
+      requestAnimationFrame(() => requestAnimationFrame(() => { row.querySelector('.bar').style.width = pct + '%'; }));
+    });
+  }
+
+  /* ---------- Bottom sheet ---------- */
+  function renderSheet() {
+    const [y, m, d] = selected.split('-').map(Number);
+    $('sheetTitle').textContent = `${d} ${MONTHS[m - 1]} ${y}`;
+    const list = expenses.filter(e => e.date === selected);
+    const sum = list.reduce((s, e) => s + e.amount, 0);
+    $('sheetSum').textContent = list.length ? `${list.length} harcama · toplam ${fmt(sum)}` : 'Bu güne ait harcama yok';
+
+    const ul = $('dayList');
+    ul.innerHTML = '';
+    if (!list.length) {
+      const li = document.createElement('li');
+      li.className = 'text-sm text-slate-400 bg-slate-900/50 border border-dashed border-slate-600 rounded-xl px-3 py-4 text-center';
+      li.textContent = 'Aşağıdaki formdan bir harcama ekle.';
+      ul.appendChild(li);
+    }
+    list.forEach(e => {
+      const color = CATS[e.cat] || CATS['Diğer'];
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-3 bg-slate-900/70 rounded-xl border border-slate-700 px-3 py-2.5';
+      li.innerHTML = `
+        <span class="h-8 w-1.5 rounded-full shrink-0" style="background:${color}"></span>
+        <div class="min-w-0 flex-1">
+          <p class="desc text-sm font-medium truncate"></p>
+          <p class="cat text-xs text-slate-400"></p>
+        </div>
+        <span class="font-bold tabular-nums text-sm">${fmt(e.amount)}</span>
+        <button type="button" aria-label="Harcamayı sil" class="del h-9 w-9 shrink-0 rounded-full grid place-items-center text-red-400 hover:bg-red-500/15 active:scale-90">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+        </button>`;
+      li.querySelector('.desc').textContent = e.desc;
+      li.querySelector('.cat').textContent = e.cat;
+      li.querySelector('.del').addEventListener('click', () => {
+        expenses = expenses.filter(x => x.id !== e.id);
+        save(expenses);
+        markEdit();
+        renderSheet();
+        render();
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  function openSheet(key) {
+    selected = key;
+    renderSheet();
+    $('overlay').classList.add('open');
+    $('sheet').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSheet() {
+    $('overlay').classList.remove('open');
+    $('sheet').classList.remove('open');
+    document.body.style.overflow = '';
+    selected = null;
+  }
+
+  /* ---------- Olaylar ---------- */
+  function shiftMonth(delta) {
+    viewM += delta;
+    if (viewM < 0) { viewM = 11; viewY--; }
+    if (viewM > 11) { viewM = 0; viewY++; }
+    render();
+  }
+  $('prevBtn').addEventListener('click', () => shiftMonth(-1));
+  $('nextBtn').addEventListener('click', () => shiftMonth(1));
+  $('todayBtn').addEventListener('click', () => { viewY = today.getFullYear(); viewM = today.getMonth(); render(); });
+  $('overlay').addEventListener('click', closeSheet);
+  $('closeBtn').addEventListener('click', closeSheet);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && selected) closeSheet(); });
+
+  const catSel = $('fCat');
+  Object.keys(CATS).forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    catSel.appendChild(o);
+  });
+
+  $('addForm').addEventListener('submit', ev => {
+    ev.preventDefault();
+    const desc = $('fDesc').value.trim();
+    const amount = parseFloat($('fAmount').value);
+    if (!desc || !(amount > 0) || !selected) return;
+    const item = { id: uid(), date: selected, desc, amount, cat: catSel.value };
+    expenses.push(item);
+    save(expenses);
+    markEdit();
+    $('fDesc').value = '';
+    $('fAmount').value = '';
+    renderSheet();
+    render();
+    $('fDesc').focus();
+  });
+
+  /* ---------- Başlatma ---------- */
+  async function init() {
+    try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); lsOk = true; } catch (e) { lsOk = false; }
+    let best = lsRead();
+    try {
+      const fromIdb = parsePayload(await idbGet());
+      idbOk = true;
+      if (fromIdb && (!best || fromIdb.savedAt > best.savedAt)) best = fromIdb;
+    } catch (e) { idbOk = false; }
+    if (best) { expenses = best.items; render(); }
+    expenses = best ? best.items : demoData();   // ilk açılışta örnek veri
+    save(expenses, best ? best.savedAt : 0);     // yerel depoları eşitle (kayıt zamanını değiştirmeden)
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    render();
+  }
+
+  /* ---------- Yedekleme ---------- */
+  $('exportBtn').addEventListener('click', async () => {
+    const real = expenses.filter(e => !e.demo);
+    const json = JSON.stringify({ app: 'harcama-takvimi', v: 1, exportedAt: new Date().toISOString(), items: real }, null, 2);
+    const name = `harcama-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+    // iPhone/iPad: paylaşım menüsü -> «Dosyalara Kaydet»
+    try {
+      if (typeof File === 'function' && navigator.canShare && navigator.share) {
+        const file = new File([json], name, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Harcama yedeği' });
+          markBackup();
+          toast(`${real.length} harcama yedeklendi`);
+          return;
+        }
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // kullanıcı menüyü kapattı
+    }
+    // Yedek yöntem: doğrudan indirme
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    markBackup();
+    toast(`${real.length} harcama yedeklendi`);
+  });
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async ev => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    try {
+      const p = parsePayload(await file.text());
+      if (!p) throw new Error('format');
+      const valid = p.items.filter(e => e && typeof e.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) &&
+        typeof e.desc === 'string' && Number(e.amount) > 0)
+        .map(e => ({ id: e.id.slice(0, 64), date: e.date, desc: e.desc.slice(0, 60), amount: Number(e.amount), cat: CATS[e.cat] ? e.cat : 'Diğer' }));
+      const byId = new Map(expenses.map(e => [e.id, e]));
+      valid.forEach(e => byId.set(e.id, e));
+      expenses = [...byId.values()];
+      save(expenses);
+      markEdit();
+      render();
+      toast(`${valid.length} harcama yüklendi`);
+    } catch (e) {
+      toast('Bu dosya geçerli bir yedek değil');
+    }
+  });
+  $('clearDemoBtn').addEventListener('click', () => {
+    expenses = expenses.filter(e => !e.demo);
+    save(expenses);
+    render();
+    toast('Örnek veriler temizlendi');
+  });
+
+  render();
+  init();
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
